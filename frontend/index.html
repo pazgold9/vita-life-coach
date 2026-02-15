@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vita — AI Wellness & Nutrition Coach</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Vita</h1>
+    <p class="tagline">AI-Powered Wellness & Nutrition Coach</p>
+  </header>
+  <main>
+    <section class="input-section">
+      <label for="prompt">Your question or goal</label>
+      <textarea id="prompt" rows="4" placeholder="e.g. What's a healthy breakfast for weight loss? Is intermittent fasting supported by research? I need stress relief tips."></textarea>
+      <button id="run-agent" type="button">Run Agent</button>
+      <p id="status" class="status" aria-live="polite"></p>
+    </section>
+    <section class="output-section" id="output-section" hidden>
+      <h2>Response</h2>
+      <div id="response" class="response"></div>
+    </section>
+    <section class="steps-section" id="steps-section" hidden>
+      <h2>Execution steps</h2>
+      <div id="steps" class="steps"></div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
