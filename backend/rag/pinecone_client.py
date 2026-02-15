@@ -1,6 +1,6 @@
 """Pinecone index connection and query helpers."""
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from backend import config
 from backend.rag.embedder import embed_single
@@ -72,7 +72,7 @@ def upsert_vectors(
     namespace: str,
     ids: list[str],
     vectors: list[list[float]],
-    metadatas: list[dict[str, Any]] | None = None,
+    metadatas: Optional[list] = None,
 ) -> None:
     """Upsert vectors to the given namespace. metadatas[i] for ids[i]/vectors[i]."""
     idx = get_index()
@@ -86,7 +86,7 @@ def upsert_vectors(
     idx.upsert(vectors=records, namespace=namespace)
 
 
-def _sanitize_meta_val(v: Any) -> str | float | int | bool:
+def _sanitize_meta_val(v: Any):
     """Pinecone metadata values must be str, float, int, or bool."""
     if isinstance(v, (str, float, int, bool)):
         return v

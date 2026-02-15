@@ -52,26 +52,23 @@ def main():
     except ImportError:
         logger.error("Install datasets: pip install datasets")
         return 1
-    logger.info("Loading openfoodfacts/product-database (sample)...")
-    try:
-        ds = load_dataset("openfoodfacts/product-database", split="train", trust_remote_code=True)
-    except Exception as e:
-        logger.warning("Full load failed (%s), trying stream...", e)
-        ds = load_dataset("openfoodfacts/product-database", split="train", streaming=True, trust_remote_code=True)
+    logger.info("Loading openfoodfacts/product-database...")
+    ds = load_dataset("openfoodfacts/product-database", trust_remote_code=True)
+    if "train" in ds:
+        ds = ds["train"]
+    else:
+        ds = ds[list(ds.keys())[0]]
     texts = []
     ids = []
     n = 0
-    for i, row in enumerate(ds):
+    for i in range(min(MAX_ROWS, len(ds))):
         if n >= 500:
             break
-        if i >= MAX_ROWS:
-            break
+        row = ds[i]
         if hasattr(row, "keys"):
             r = dict(row)
-        elif hasattr(ds, "column_names"):
-            r = dict(zip(ds.column_names, row))
         else:
-            r = {}
+            r = dict(zip(ds.column_names, row)) if hasattr(ds, "column_names") else {}
         t = build_text(r)
         if not t or len(t) < 30:
             continue

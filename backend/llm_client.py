@@ -1,6 +1,6 @@
 """OpenAI-compatible LLM client for LLMod.ai."""
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from openai import OpenAI
 
@@ -8,7 +8,7 @@ from backend import config
 
 logger = logging.getLogger(__name__)
 
-_client: OpenAI | None = None
+_client = None  # Optional[OpenAI]
 
 
 def get_client() -> OpenAI:
@@ -23,8 +23,8 @@ def get_client() -> OpenAI:
 
 
 def chat(
-    messages: list[dict[str, str]],
-    model: str | None = None,
+    messages: list,
+    model: Optional[str] = None,
 ) -> str:
     """
     Send a chat completion request and return the assistant message content.
@@ -38,10 +38,25 @@ def chat(
     return resp.choices[0].message.content or ""
 
 
+def _resp_to_dict(resp):
+    """Convert API response to plain dict for logging (avoid non-JSON types)."""
+    try:
+        if hasattr(resp, "model_dump"):
+            return resp.model_dump()
+        if hasattr(resp, "dict"):
+            return resp.dict()
+    except Exception:
+        pass
+    content = ""
+    if getattr(resp, "choices", None) and len(resp.choices) > 0:
+        content = getattr(resp.choices[0].message, "content", "") or ""
+    return {"choices": [{"message": {"content": content}}]}
+
+
 def chat_with_raw_response(
-    messages: list[dict[str, str]],
-    model: str | None = None,
-) -> tuple[str, dict[str, Any]]:
+    messages: list,
+    model: Optional[str] = None,
+):
     """
     Same as chat() but also return the raw API response for step logging.
     Returns (content, raw_response_dict).
@@ -52,11 +67,11 @@ def chat_with_raw_response(
     if not resp.choices:
         raise ValueError("Empty completion response")
     content = resp.choices[0].message.content or ""
-    raw = resp.model_dump() if hasattr(resp, "model_dump") else {}
+    raw = _resp_to_dict(resp)
     return content, raw
 
 
-def embed(texts: list[str], model: str | None = None) -> list[list[float]]:
+def embed(texts: list, model: Optional[str] = None):
     """Return embeddings for the given texts. Uses config embedding model."""
     if not texts:
         return []

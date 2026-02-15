@@ -39,6 +39,7 @@
       const data = await res.json();
 
       if (data.status === 'ok') {
+        responseEl.className = 'response';
         responseEl.textContent = data.response || '';
         outputSection.hidden = false;
         if (data.steps && data.steps.length) {
@@ -60,8 +61,10 @@
         }
         setStatus('Done.');
       } else {
-        setStatus('Error: ' + (data.error || 'Unknown error'));
-        responseEl.textContent = '';
+        const errMsg = data.error || 'Unknown error';
+        setStatus('Error');
+        responseEl.textContent = errMsg;
+        responseEl.className = 'response response-error';
         outputSection.hidden = false;
       }
     } catch (err) {

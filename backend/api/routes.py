@@ -6,6 +6,19 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
 from backend import config
+
+
+def _json_safe(obj):
+    """Convert to JSON-serializable form (raw API responses can have datetime etc)."""
+    if obj is None:
+        return None
+    if isinstance(obj, (str, int, float, bool)):
+        return obj
+    if isinstance(obj, dict):
+        return {str(k): _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(x) for x in obj]
+    return str(obj)
 from backend.api.schemas import (
     AgentInfoResponse,
     ExecuteRequest,
@@ -18,6 +31,17 @@ from backend.api.schemas import (
 
 router = APIRouter(prefix="/api", tags=["api"])
 logger = logging.getLogger(__name__)
+
+
+@router.get("/env_check")
+def get_env_check():
+    """Check if required env vars are set (no values exposed). Use to debug .env loading."""
+    return {
+        "llmod_api_key_set": bool(config.LLMOD_API_KEY),
+        "llmod_base_url": config.LLMOD_BASE_URL[:30] + "..." if config.LLMOD_BASE_URL and len(config.LLMOD_BASE_URL) > 30 else (config.LLMOD_BASE_URL or "(not set)"),
+        "pinecone_api_key_set": bool(config.PINECONE_API_KEY),
+        "pinecone_index_name": config.PINECONE_INDEX_NAME or "(not set)",
+    }
 
 
 @router.get("/team_info", response_model=TeamInfoResponse)
@@ -77,22 +101,43 @@ def get_model_architecture():
 @router.post("/execute", response_model=ExecuteResponse)
 def post_execute(body: ExecuteRequest) -> ExecuteResponse:
     """Main entry: run the agent and return response + full step trace."""
+    if not (config.LLMOD_API_KEY and config.LLMOD_API_KEY.strip()):
+        return ExecuteResponse(
+            status="error",
+            error="LLMOD_API_KEY is not set. Add it to your .env file in the project root (see .env.example).",
+            response=None,
+            steps=[],
+        )
     try:
-        # Placeholder: will call runner/orchestrator once implemented
         from backend.agents.runner import run_agent
 
         response_text, steps = run_agent(body.prompt)
+        safe_steps = [
+            StepRecord(
+                module=s["module"],
+                prompt=_json_safe(s["prompt"]),
+                response=_json_safe(s["response"]),
+            )
+            for s in steps
+        ]
         return ExecuteResponse(
             status="ok",
             error=None,
             response=response_text,
-            steps=[StepRecord(module=s["module"], prompt=s["prompt"], response=s["response"]) for s in steps],
+            steps=safe_steps,
         )
     except Exception as e:
         logger.exception("Execute failed")
+        err_msg = str(e)
+        if "api_key" in err_msg.lower() or "auth" in err_msg.lower() or "401" in err_msg:
+            err_msg = "LLM API rejected the request (auth error). API said: %s — Check that your LLMOD_API_KEY is the exact key from LLMod.ai (re-copy it, no spaces). LLMOD_BASE_URL is correct (https://api.llmod.ai/v1)." % err_msg
+        elif "pinecone" in err_msg.lower() or "index" in err_msg.lower():
+            err_msg = "Pinecone error: %s. Ensure PINECONE_INDEX_NAME exists in Pinecone and its dimension matches your embedding model (e.g. 1536)." % err_msg
+        elif "connection" in err_msg.lower() or "timeout" in err_msg.lower() or "refused" in err_msg.lower():
+            err_msg = "Cannot reach the LLM API. Check LLMOD_BASE_URL in .env (must be the exact URL from LLMod.ai, e.g. https://api.llmod.ai/v1)."
         return ExecuteResponse(
             status="error",
-            error=str(e),
+            error=err_msg,
             response=None,
             steps=[],
         )

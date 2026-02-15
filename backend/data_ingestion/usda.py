@@ -1,4 +1,4 @@
-"""Ingest USDA FoodData Central (CSV from Kaggle) into Pinecone namespace 'usda'."""
+"""Ingest USDA FoodData Central (Kaggle via kagglehub) into Pinecone namespace 'usda'."""
 import csv
 import logging
 import sys
@@ -14,8 +14,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 NAMESPACE = "usda"
 BATCH_SIZE = 50
-# Path to CSV: download from https://www.kaggle.com/datasets/joebeachcapital/fooddata-central
-USDA_CSV = Path(__file__).resolve().parent.parent.parent / "data" / "fooddata-central.csv"
 MAX_ROWS = 10000
 
 
@@ -37,6 +35,18 @@ def build_text(row: dict) -> str:
     return "\n".join(parts)[:8000]
 
 
+def _find_food_csv(root: Path):
+    """Find main food CSV in Kaggle dataset directory (e.g. food.csv, food_data.csv)."""
+    for name in ("food.csv", "food_data.csv", "FoodData_Central_foundation_food.csv", "foundation_food.csv"):
+        p = root / name
+        if p.exists():
+            return p
+    for p in root.rglob("*.csv"):
+        if "food" in p.name.lower() and "nutrient" not in p.name.lower():
+            return p
+    return None
+
+
 def main():
     if not config.PINECONE_API_KEY or not config.LLMOD_API_KEY:
         logger.error("Set PINECONE_API_KEY and LLMOD_API_KEY")
@@ -45,15 +55,26 @@ def main():
     if idx is None:
         logger.error("Pinecone index not available")
         return 1
-    if not USDA_CSV.exists():
-        logger.error(
-            "USDA CSV not found at %s. Download from https://www.kaggle.com/datasets/joebeachcapital/fooddata-central and place CSV as data/fooddata-central.csv",
-            USDA_CSV,
-        )
+    try:
+        import kagglehub
+    except ImportError:
+        logger.error("Install kagglehub: pip install kagglehub. Then ensure Kaggle API is set up (kaggle.json or KAGGLE_USERNAME/KAGGLE_KEY).")
         return 1
+    logger.info("Downloading joebeachcapital/fooddata-central via kagglehub...")
+    try:
+        path = kagglehub.dataset_download("joebeachcapital/fooddata-central")
+    except Exception as e:
+        logger.error("Kaggle download failed: %s. Ensure kagglehub is installed and Kaggle API credentials are set.", e)
+        return 1
+    root = Path(path)
+    csv_path = _find_food_csv(root)
+    if not csv_path or not csv_path.exists():
+        logger.error("No food CSV found under %s. Looked for food.csv, food_data.csv, etc.", root)
+        return 1
+    logger.info("Reading %s...", csv_path)
     texts = []
     ids = []
-    with open(USDA_CSV, newline="", encoding="utf-8", errors="replace") as f:
+    with open(csv_path, newline="", encoding="utf-8", errors="replace") as f:
         reader = csv.DictReader(f)
         columns = reader.fieldnames or []
         for i, row in enumerate(reader):
@@ -65,7 +86,7 @@ def main():
             texts.append(t)
             ids.append(f"usda_{i}")
     if not texts:
-        logger.error("No valid texts from USDA CSV (check column names: %s)", columns)
+        logger.error("No valid texts from USDA CSV (columns: %s)", columns)
         return 1
     logger.info("Embedding %d texts in batches of %d...", len(texts), BATCH_SIZE)
     all_vectors = []

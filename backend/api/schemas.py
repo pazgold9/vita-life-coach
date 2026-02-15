@@ -1,5 +1,5 @@
 """Pydantic request/response schemas for API."""
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -41,8 +41,8 @@ class ExecuteRequest(BaseModel):
 
 class StepRecord(BaseModel):
     module: str
-    prompt: dict[str, Any] | list[Any]
-    response: dict[str, Any] | list[Any] | str
+    prompt: Union[Dict[str, Any], List[Any]]
+    response: Union[Dict[str, Any], List[Any], str]
 
 
 class ExecuteResponse(BaseModel):

@@ -40,7 +40,15 @@ def main():
         logger.error("Install datasets: pip install datasets")
         return 1
     logger.info("Loading ccdv/pubmed-summarization...")
-    ds = load_dataset("ccdv/pubmed-summarization", split="train", trust_remote_code=True)
+    try:
+        ds = load_dataset("ccdv/pubmed-summarization", "section", trust_remote_code=True)
+    except Exception:
+        ds = load_dataset("ccdv/pubmed-summarization", split="train", trust_remote_code=True)
+    if isinstance(ds, dict):
+        if "train" in ds:
+            ds = ds["train"]
+        else:
+            ds = ds[list(ds.keys())[0]]
     texts = []
     ids = []
     for i, row in enumerate(ds):
