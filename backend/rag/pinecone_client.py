@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 _index = None
 
-NAMESPACES = {"openfoodfacts", "pubmed", "usda"}
+NAMESPACES = {"openfoodfacts", "pubmed", "usda", "wellness"}
 
 
 def get_index():

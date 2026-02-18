@@ -16,22 +16,31 @@ BATCH_SIZE = 50
 MAX_ROWS = 50000  # sample for budget; increase if needed
 
 
+def _safe_str(val) -> str:
+    """Extract a clean string from a value that may be str, list, or None."""
+    if val is None:
+        return ""
+    if isinstance(val, list):
+        return str(val[0]).strip() if val else ""
+    return str(val).strip()
+
+
 def build_text(row: dict) -> str:
     """Build a single text chunk from an Open Food Facts row."""
     parts = []
-    name = (row.get("product_name") or row.get("product_name_en") or "").strip()
+    name = _safe_str(row.get("product_name") or row.get("product_name_en"))
     if name:
         parts.append(f"Product: {name}")
-    brands = (row.get("brands") or "").strip()
+    brands = _safe_str(row.get("brands"))
     if brands:
         parts.append(f"Brands: {brands}")
-    ingredients = (row.get("ingredients_text") or "").strip()
+    ingredients = _safe_str(row.get("ingredients_text"))
     if ingredients:
         parts.append(f"Ingredients: {ingredients[:1500]}")
-    nutriscore = (row.get("nutriscore_grade") or "").strip()
+    nutriscore = _safe_str(row.get("nutriscore_grade"))
     if nutriscore:
         parts.append(f"Nutri-score: {nutriscore}")
-    categories = (row.get("categories") or "").strip()
+    categories = _safe_str(row.get("categories"))
     if categories:
         parts.append(f"Categories: {categories[:500]}")
     if not parts:

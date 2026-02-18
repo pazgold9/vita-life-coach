@@ -46,3 +46,14 @@ def get_research_context(query: str, top_k: int = MAX_CHUNKS) -> str:
     except Exception as e:
         logger.warning("RAG research context failed (using empty context): %s", e)
         return ""
+
+
+def get_wellness_context(query: str, top_k: int = MAX_CHUNKS) -> str:
+    """Retrieve context from wellness namespace (PubMed abstracts on exercise, sleep, stress, mindfulness)."""
+    try:
+        if get_index() is None:
+            return ""
+        return "\n".join(retrieve_texts("wellness", query, top_k=top_k))
+    except Exception as e:
+        logger.warning("RAG wellness context failed (using empty context): %s", e)
+        return ""

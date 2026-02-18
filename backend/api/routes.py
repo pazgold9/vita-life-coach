@@ -1,11 +1,16 @@
 """API route handlers for Vita."""
+import json
 import logging
+import queue
+import threading
 from pathlib import Path
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse, StreamingResponse
 
 from backend import config
+from backend import db
 
 
 def _json_safe(obj):
@@ -19,6 +24,8 @@ def _json_safe(obj):
     if isinstance(obj, (list, tuple)):
         return [_json_safe(x) for x in obj]
     return str(obj)
+
+
 from backend.api.schemas import (
     AgentInfoResponse,
     ExecuteRequest,
@@ -35,12 +42,13 @@ logger = logging.getLogger(__name__)
 
 @router.get("/env_check")
 def get_env_check():
-    """Check if required env vars are set (no values exposed). Use to debug .env loading."""
+    """Check if required env vars are set (no values exposed)."""
     return {
         "llmod_api_key_set": bool(config.LLMOD_API_KEY),
         "llmod_base_url": config.LLMOD_BASE_URL[:30] + "..." if config.LLMOD_BASE_URL and len(config.LLMOD_BASE_URL) > 30 else (config.LLMOD_BASE_URL or "(not set)"),
         "pinecone_api_key_set": bool(config.PINECONE_API_KEY),
         "pinecone_index_name": config.PINECONE_INDEX_NAME or "(not set)",
+        "supabase_connected": bool(config.SUPABASE_URL and config.SUPABASE_SERVICE_KEY),
     }
 
 
@@ -58,8 +66,18 @@ def get_team_info() -> TeamInfoResponse:
 def get_agent_info() -> AgentInfoResponse:
     """Return agent meta: description, purpose, prompt template, and examples."""
     return AgentInfoResponse(
-        description="Vita is an AI-powered wellness and nutrition coach with a single Orchestrator Agent (Head Coach) that plans user goals, routes sub-tasks to three specialists (Nutrition Expert, Science Researcher, Wellness Coach), and synthesizes a final answer. Nutrition and Science use RAG over Open Food Facts, USDA FoodData Central, and PubMed; Wellness Coach is LLM-only for stress, exercise, and mindfulness.",
-        purpose="To reduce nutrition confusion and adherence friction by providing precise dietary recommendations (RAG), evidence-based answers from research (RAG), and non-diet wellness protocols.",
+        description=(
+            "Vita is an AI-powered wellness and nutrition coach built on a Supervisor Agent architecture. "
+            "An Orchestrator Agent (Head Coach) autonomously plans user goals using a ReAct reasoning loop, "
+            "then delegates sub-tasks to three autonomous specialist agents: "
+            "Nutrition Expert (RAG over Open Food Facts + USDA), "
+            "Science Researcher (RAG over PubMed), and "
+            "Wellness Coach (autonomous reasoning for stress, exercise, mindfulness). "
+            "Each specialist runs its own ReAct loop with domain-specific tools, and the Orchestrator "
+            "synthesizes all specialist outputs into a single coherent response. "
+            "Conversation history is persisted via Supabase."
+        ),
+        purpose="To reduce nutrition confusion and adherence friction by providing precise dietary recommendations (RAG), evidence-based answers from research (RAG), and non-diet wellness protocols — all coordinated by an autonomous multi-agent system.",
         prompt_template=PromptTemplate(
             template="Describe your goal or question in one or two sentences. Examples: 'What's a healthy breakfast for weight loss?', 'Is intermittent fasting supported by research?', 'I need stress relief tips.' The Orchestrator will decompose your request into sub-tasks and route each to the right specialist, then return one coherent response."
         ),
@@ -71,12 +89,12 @@ def get_agent_info() -> AgentInfoResponse:
                     {
                         "module": "Orchestrator Agent",
                         "prompt": {"messages": [{"role": "user", "content": "Plan and route: What's a healthy breakfast for weight loss?"}]},
-                        "response": {"choices": [{"message": {"content": "[{\"task\": \"Suggest a healthy breakfast\", \"specialist\": \"Nutrition Expert\"}]"}}]},
+                        "response": {"choices": [{"message": {"content": "Thought: The user wants a healthy breakfast for weight loss. I should ask the Nutrition Expert for food options.\nAction: call_specialist\nAction Input: Nutrition Expert | Suggest healthy breakfast options for weight loss with calorie counts"}}]},
                     },
                     {
                         "module": "Nutrition Expert",
-                        "prompt": {"task": "Suggest a healthy breakfast", "messages": "..."},
-                        "response": {"choices": [{"message": {"content": "Protein (eggs, yogurt), fiber (oats), minimal sugar..."}}]},
+                        "prompt": {"messages": [{"role": "system", "content": "You are a Nutrition Expert..."}, {"role": "user", "content": "Task: Suggest healthy breakfast options for weight loss with calorie counts"}]},
+                        "response": {"choices": [{"message": {"content": "Thought: I can answer this from my expertise.\nAction: finish\nAction Input: Protein (eggs, yogurt), fiber (oats), minimal sugar..."}}]},
                     },
                     {
                         "module": "Orchestrator Agent",
@@ -98,6 +116,24 @@ def get_model_architecture():
     return FileResponse(path, media_type="image/png")
 
 
+@router.get("/history")
+def get_conversation_history(
+    session_id: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+):
+    """Return recent conversation history from Supabase."""
+    return db.get_history(session_id=session_id, limit=limit)
+
+
+@router.get("/profile")
+def get_user_profile():
+    """Return the current user profile from Supabase."""
+    profile = db.get_profile()
+    if not profile:
+        return {}
+    return {k: v for k, v in profile.items() if k != "id" and k != "updated_at" and v is not None}
+
+
 @router.post("/execute", response_model=ExecuteResponse)
 def post_execute(body: ExecuteRequest) -> ExecuteResponse:
     """Main entry: run the agent and return response + full step trace."""
@@ -111,7 +147,10 @@ def post_execute(body: ExecuteRequest) -> ExecuteResponse:
     try:
         from backend.agents.runner import run_agent
 
-        response_text, steps = run_agent(body.prompt)
+        response_text, steps = run_agent(
+            body.prompt,
+            conversation_history=[t.model_dump() for t in body.conversation_history],
+        )
         safe_steps = [
             StepRecord(
                 module=s["module"],
@@ -120,6 +159,15 @@ def post_execute(body: ExecuteRequest) -> ExecuteResponse:
             )
             for s in steps
         ]
+
+        session_id = getattr(body, "session_id", None)
+        db.save_conversation(
+            prompt=body.prompt,
+            response=response_text,
+            steps=[s.model_dump() for s in safe_steps],
+            session_id=session_id,
+        )
+
         return ExecuteResponse(
             status="ok",
             error=None,
@@ -129,7 +177,9 @@ def post_execute(body: ExecuteRequest) -> ExecuteResponse:
     except Exception as e:
         logger.exception("Execute failed")
         err_msg = str(e)
-        if "api_key" in err_msg.lower() or "auth" in err_msg.lower() or "401" in err_msg:
+        if "contentpolicy" in err_msg.lower() or "content_filter" in err_msg.lower() or "responsibleai" in err_msg.lower():
+            err_msg = "I'm sorry, I wasn't able to process that request due to content restrictions. You can try rephrasing your question, or start a new conversation to continue."
+        elif "api_key" in err_msg.lower() or "auth" in err_msg.lower() or "401" in err_msg:
             err_msg = "LLM API rejected the request (auth error). API said: %s — Check that your LLMOD_API_KEY is the exact key from LLMod.ai (re-copy it, no spaces). LLMOD_BASE_URL is correct (https://api.llmod.ai/v1)." % err_msg
         elif "pinecone" in err_msg.lower() or "index" in err_msg.lower():
             err_msg = "Pinecone error: %s. Ensure PINECONE_INDEX_NAME exists in Pinecone and its dimension matches your embedding model (e.g. 1536)." % err_msg
@@ -141,3 +191,55 @@ def post_execute(body: ExecuteRequest) -> ExecuteResponse:
             response=None,
             steps=[],
         )
+
+
+@router.post("/execute_stream")
+def post_execute_stream(body: ExecuteRequest):
+    """SSE endpoint: streams progress events then the final response."""
+    if not (config.LLMOD_API_KEY and config.LLMOD_API_KEY.strip()):
+        def _err():
+            yield f"data: {json.dumps({'event': 'error', 'error': 'LLMOD_API_KEY is not set.'})}\n\n"
+        return StreamingResponse(_err(), media_type="text/event-stream")
+
+    event_queue: queue.Queue = queue.Queue()
+
+    def on_progress(event_type: str, data: dict):
+        event_queue.put(json.dumps({"event": event_type, **data}))
+
+    def run_in_background():
+        try:
+            from backend.agents.runner import run_agent
+
+            response_text, steps = run_agent(
+                body.prompt,
+                conversation_history=[t.model_dump() for t in body.conversation_history],
+                on_progress=on_progress,
+            )
+            safe_steps = [
+                {"module": s["module"], "prompt": _json_safe(s["prompt"]), "response": _json_safe(s["response"])}
+                for s in steps
+            ]
+            event_queue.put(json.dumps({
+                "event": "result",
+                "status": "ok",
+                "response": response_text,
+                "steps": safe_steps,
+            }))
+        except Exception as e:
+            logger.exception("Stream execute failed")
+            err_msg = str(e)
+            if "contentpolicy" in err_msg.lower() or "content_filter" in err_msg.lower() or "responsibleai" in err_msg.lower():
+                err_msg = "I'm sorry, I wasn't able to process that request due to content restrictions. You can try rephrasing your question, or start a new conversation to continue."
+            event_queue.put(json.dumps({"event": "error", "error": err_msg}))
+        event_queue.put(None)
+
+    threading.Thread(target=run_in_background, daemon=True).start()
+
+    def event_generator():
+        while True:
+            item = event_queue.get(timeout=300)
+            if item is None:
+                break
+            yield f"data: {item}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

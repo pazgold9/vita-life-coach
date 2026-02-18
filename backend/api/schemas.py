@@ -35,8 +35,14 @@ class AgentInfoResponse(BaseModel):
 
 
 # --- Execute ---
+class ConversationTurn(BaseModel):
+    role: str
+    content: str
+
+
 class ExecuteRequest(BaseModel):
     prompt: str = Field(..., description="User request")
+    conversation_history: list[ConversationTurn] = Field(default_factory=list)
 
 
 class StepRecord(BaseModel):

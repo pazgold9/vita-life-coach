@@ -23,6 +23,10 @@ LLMod.ai gives you **$13 total**. To stay within budget:
 - **Ingestion:** Embedding for PubMed/Open Food Facts/USDA uses the same LLMod.ai budget. Run ingestion **once** (or a few times), not on every deploy. Keep ingestion sample sizes modest (e.g. 500–2000 rows per dataset).
 - **RAG:** We already use `top_k=3` and one embedding per nutrition query to reduce cost.
 
+## Deploy on Render
+
+See **[DEPLOY_RENDER.md](DEPLOY_RENDER.md)** for step-by-step instructions. Use **Environment** in the Render dashboard for all API keys; never commit `.env`.
+
 ## Run locally
 
 1. From the project root:

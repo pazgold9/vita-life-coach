@@ -18,13 +18,19 @@
       <button id="run-agent" type="button">Run Agent</button>
       <p id="status" class="status" aria-live="polite"></p>
     </section>
+
     <section class="output-section" id="output-section" hidden>
       <h2>Response</h2>
       <div id="response" class="response"></div>
     </section>
     <section class="steps-section" id="steps-section" hidden>
-      <h2>Execution steps</h2>
+      <h2>Execution Steps</h2>
       <div id="steps" class="steps"></div>
+    </section>
+
+    <section class="history-section">
+      <h2>Conversation History</h2>
+      <div id="history" class="history"><p class="history-empty">No conversations yet.</p></div>
     </section>
   </main>
   <script src="app.js"></script>

@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 NAMESPACE = "pubmed"
 BATCH_SIZE = 50
-MAX_TEXTS = 2000  # cap for budget; increase if needed
+MAX_TEXTS = 500  # cap for budget; increase if needed
 
 
 def build_text(record: dict) -> str:
