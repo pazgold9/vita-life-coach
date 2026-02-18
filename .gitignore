@@ -25,3 +25,6 @@ data/*.csv
 # Local/docs — only README.md is in repo
 COMMIT_SUMMARY.md
 DEPLOY_RENDER.md
+
+# Optional (Render: use Start Command in dashboard)
+Procfile
