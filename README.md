@@ -2,30 +2,9 @@
 
 Vita is an AI agent that reduces **nutrition confusion** and **adherence friction** using an Orchestrator Agent (Head Coach) and three specialists: **Nutrition Expert** (RAG), **Science Researcher** (RAG), and **Wellness Coach**.
 
-## Where to set `LLMOD_API_KEY`
+## Live Demo
 
-- **Locally:** Create a file named `.env` in the project root (`vita_life_coach/`) and add:
-  ```bash
-  LLMOD_API_KEY=your_key_here
-  LLMOD_BASE_URL=https://...   # from LLMod.ai platform
-  ```
-  Copy from `.env.example`: `cp .env.example .env` then edit `.env`. The app loads `.env` automatically. **Do not commit `.env`** (it is in `.gitignore`).
-- **On Render:** In the Render dashboard → your service → **Environment** → add `LLMOD_API_KEY` and `LLMOD_BASE_URL` (and other keys). Render injects these at runtime.
-
-Get your API key and base URL from the **LLMod.ai** platform (one key per group; all members share it).
-
-## Budget ($13)
-
-LLMod.ai gives you **$13 total**. To stay within budget:
-
-- **Agent runs:** Each Run Agent call does several LLM calls (plan + specialists + synthesize). Use **short prompts** and **fewer test runs**.
-- **Models:** We use `gpt-4o-mini` by default (cheaper). You can set `LLMOD_MODEL` in `.env` to a smaller/faster model if the platform offers one.
-- **Ingestion:** Embedding for PubMed/Open Food Facts/USDA uses the same LLMod.ai budget. Run ingestion **once** (or a few times), not on every deploy. Keep ingestion sample sizes modest (e.g. 500–2000 rows per dataset).
-- **RAG:** We already use `top_k=3` and one embedding per nutrition query to reduce cost.
-
-## Deploy on Render
-
-See **[DEPLOY_RENDER.md](DEPLOY_RENDER.md)** for step-by-step instructions. Use **Environment** in the Render dashboard for all API keys; never commit `.env`.
+The app is deployed on Render: **https://vita-life-coach.onrender.com/**
 
 ## Run locally
 
