@@ -1,17 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination: "http://localhost:8000/api/:path*",
-      },
-    ];
-  },
-  experimental: {
-    proxyTimeout: 300_000,
-  },
+  output: "export",
+  trailingSlash: true,
 };
 
 export default nextConfig;

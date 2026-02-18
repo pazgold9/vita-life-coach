@@ -19,7 +19,12 @@ app.add_middleware(
 
 app.include_router(router)
 
-# Serve frontend static files
-frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
-if frontend_dir.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
+# Serve frontend static files (prefer Next.js static export, fallback to legacy)
+_root = Path(__file__).resolve().parent.parent
+frontend_next_dir = _root / "frontend-next" / "out"
+frontend_legacy_dir = _root / "frontend"
+
+if frontend_next_dir.exists():
+    app.mount("/", StaticFiles(directory=str(frontend_next_dir), html=True), name="frontend")
+elif frontend_legacy_dir.exists():
+    app.mount("/", StaticFiles(directory=str(frontend_legacy_dir), html=True), name="frontend")
