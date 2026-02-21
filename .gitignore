@@ -1,0 +1,30 @@
+# Environment and secrets (never commit real keys)
+.env
+.env.local
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# IDE / OS
+.idea/
+.DS_Store
+
+# Data (optional; ingestion reads from here)
+data/*.csv
+!data/.gitkeep
+
+# Course / personal files (don't publish)
+*.pdf
+
+# Local/docs — only README.md is in repo
+COMMIT_SUMMARY.md
+DEPLOY_RENDER.md
+
+# Optional (Render: use Start Command in dashboard)
+Procfile
