@@ -20,6 +20,7 @@ STUDENTS = [
     {"name": os.getenv("STUDENT_1_NAME", "Student A"), "email": os.getenv("STUDENT_1_EMAIL", "a@example.com")},
     {"name": os.getenv("STUDENT_2_NAME", "Student B"), "email": os.getenv("STUDENT_2_EMAIL", "b@example.com")},
     {"name": os.getenv("STUDENT_3_NAME", "Student C"), "email": os.getenv("STUDENT_3_EMAIL", "c@example.com")},
+    {"name": os.getenv("STUDENT_4_NAME", "Student D"), "email": os.getenv("STUDENT_4_EMAIL", "d@example.com")},
 ]
 
 # LLMod.ai (OpenAI-compatible) — strip so no trailing space/newline in .env breaks the key

@@ -300,9 +300,9 @@ def _extract_and_save_profile(prompt: str, conversation_history: list[dict[str, 
 
 def run(
     prompt: str,
-    conversation_history: list[dict[str, str]] | None = None,
+    conversation_history: Optional[list[dict[str, str]]] = None,
     on_progress: ProgressCallback = None,
-    profile_mode: str | None = None,
+    profile_mode: Optional[str] = None,
 ) -> tuple[str, list[dict[str, Any]]]:
     """Run the orchestrator ReAct loop. Returns (final_response, steps)."""
     steps: list[dict[str, Any]] = []
