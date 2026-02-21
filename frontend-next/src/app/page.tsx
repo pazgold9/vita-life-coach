@@ -209,7 +209,7 @@ export default function Home() {
   }
 
   function handleSkipAttempt() {
-    if (skipAttempts >= 2) {
+    if (skipAttempts >= 1) {
       setForcedSkip(true);
     }
     setSkipAttempts((prev) => prev + 1);
@@ -541,8 +541,7 @@ export default function Home() {
               <div className="mb-3 text-center">
                 <p className="text-sm text-muted-foreground mb-2">
                   {skipAttempts === 0 && "Complete your profile to start chatting."}
-                  {skipAttempts === 1 && "Your results will be much less accurate without a complete profile. Are you sure you want to skip?"}
-                  {skipAttempts === 2 && "Last chance — Vita strongly recommends completing your profile. Without it, advice cannot be personalized at all."}
+                  {skipAttempts === 1 && "Last chance — Your results will be much less accurate without a complete profile. Are you sure you want to skip?"}
                 </p>
                 <div className="flex items-center justify-center gap-2">
                   <Button
